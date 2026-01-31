@@ -1,0 +1,37 @@
+# Use the official Golang Alpine image to create a build artifact.
+FROM golang:1.22 as builder
+
+# Set the Current Working Directory inside the container
+WORKDIR /app
+
+# Copy go mod and sum files
+COPY go.mod go.sum ./
+
+# Download all dependencies. Dependencies will be cached if the go mod and go sum files are not changed
+RUN go mod download
+
+# Copy the source code into the container
+COPY . .
+COPY .env.dev /app/.env
+
+# Build the Go app
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o fdlp-api ./cmd
+
+# Start a new stage from scratch using the alpine base image
+FROM golang:1.22-alpine
+
+# Set the Current Working Directory inside the container
+WORKDIR /root/
+
+# Copy the pre-built binary file from the previous stage
+COPY --from=builder /app/fdlp-api .
+
+# Copy the `.env` file explicitly into the runtime environment
+COPY --from=builder /app/.env .
+
+# Expose port 8080 to the outside world
+EXPOSE 8080
+
+# Command to run the executable along with migration
+CMD ["sh", "-c", "./fdlp-api"]
+

@@ -1,0 +1,15 @@
+@contentType = application/json
+
+# Role Create
+POST http://localhost:1323/role/create-role
+Content-Type: {{contentType}}
+
+{
+    "name": "admin",
+    "description": "Administrator"
+}
+###
+
+# Role Get
+GET  http://localhost:1323/role?id=14244227-6dfc-4a58-bfc5-2d89d8d7ee83
+###

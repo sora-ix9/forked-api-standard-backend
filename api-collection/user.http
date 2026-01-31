@@ -1,0 +1,46 @@
+@contentType = application/json
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiYWRtaW4iLCJyb2xlIjoiYWRtaW4iLCJyb2xlX25hbWUiOiJBZG1pbmlzdHJhdG9yIiwiZXhwIjoxNzE0ODkzMzQ1fQ.dsGIIgQwreHMirWshKvzIVp-SW5Ku4Xk5JfA6l_3mIo
+
+# User Create
+POST http://localhost:1323/user/create-user
+Content-Type: {{contentType}}
+
+{
+    "username": "tester",
+    "email": "test@gmail.com",
+    "password": "1234"
+}
+###
+
+# User Login
+POST http://localhost:1323/user/login
+Content-Type: {{contentType}}
+
+{
+    "email": "admin@gmail.com",
+    "password": "1234"
+}
+###
+
+# User Get
+GET  http://localhost:1323/v1/user?id=14244227-6dfc-4a58-bfc5-2d89d8d7ee83
+Authorization: Bearer {{token}}
+###
+
+# User Get with Pagination
+GET  http://localhost:1323/v1/users?page=1&pageSize=10
+Authorization: Bearer {{token}}
+###
+
+# User Create with Role
+POST http://localhost:1323/v1/user/create
+Content-Type: {{contentType}}
+Authorization: Bearer {{token}}
+
+{
+    "username": "tester3",
+    "email": "test3@gmail.com",
+    "password": "1234",
+    "role_name": "tester3"
+}
+###

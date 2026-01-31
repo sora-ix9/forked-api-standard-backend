@@ -1,0 +1,1327 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Interactive ER diagram with draggable entities parsed from Mermaid notation"
+    />
+    <meta
+      property="og:title"
+      content="Pinto API - Interactive Database Schema"
+    />
+    <title>Interactive Mermaid ER Diagram - Draggable Entities</title>
+
+    <!-- Tailwind & libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            animation: {
+              "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+            },
+          },
+        },
+      };
+    </script>
+  </head>
+  <body class="bg-gray-900 text-white min-h-screen dot-grid overflow-hidden">
+    <!-- Theme Toggle -->
+    <div class="fixed top-4 right-4 z-50">
+      <button
+        onclick="toggleTheme()"
+        class="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors duration-200 border border-gray-600"
+      >
+        <span id="theme-icon">🌙</span>
+      </button>
+    </div>
+
+    <!-- Selection Info Panel -->
+    <div id="selection-info" class="fixed top-4 left-4 z-50 hidden">
+      <div class="bg-gray-800 rounded-lg p-3 shadow-lg border border-gray-700">
+        <h3 class="text-sm font-semibold text-gray-300 mb-1">
+          Selected Entities
+        </h3>
+        <div
+          id="selected-list"
+          class="text-xs text-gray-400 max-h-32 overflow-y-auto"
+        ></div>
+        <div class="mt-2 flex gap-2">
+          <button
+            onclick="clearSelection()"
+            class="px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+          >
+            Clear
+          </button>
+          <button
+            onclick="alignSelected('horizontal')"
+            class="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 rounded transition-colors"
+            title="Align Horizontally"
+          >
+            ↔️
+          </button>
+          <button
+            onclick="alignSelected('vertical')"
+            class="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 rounded transition-colors"
+            title="Align Vertically"
+          >
+            ↕️
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Instructions Panel -->
+    <div class="fixed bottom-20 left-4 z-50">
+      <button
+        onclick="toggleInstructions()"
+        class="mb-2 px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+      >
+        Toggle Help
+      </button>
+      <div
+        id="instructions"
+        class="bg-gray-800 bg-opacity-90 rounded-lg p-3 shadow-lg border border-gray-700 text-xs"
+      >
+        <h4 class="font-semibold text-gray-300 mb-1">Controls:</h4>
+        <ul class="text-gray-400 space-y-1">
+          <li>🖱️ <b>Click</b> - Select entity</li>
+          <li>🖐️ <b>Drag</b> - Move selected entities</li>
+          <li>⌨️ <b>Ctrl/Cmd + Click</b> - Multi-select</li>
+          <li>📦 <b>Shift + Drag</b> - Box select</li>
+          <li>🔍 <b>Mouse Wheel</b> - Zoom</li>
+          <li>📍 <b>Space + Drag</b> - Pan view</li>
+          <li>🔄 <b>Double Click</b> - Focus entity</li>
+          <li>❌ <b>Esc</b> - Clear selection</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="loading" class="min-h-screen flex items-center justify-center">
+      <div class="text-center">
+        <div class="animate-pulse-slow text-4xl mb-4">📊</div>
+        <div class="text-lg text-gray-300">Loading Mermaid ER diagram...</div>
+        <div class="mt-2 text-sm text-gray-500">
+          Parsing entities and relationships
+        </div>
+      </div>
+    </div>
+
+    <!-- Canvas Container -->
+    <div id="canvas-container" class="hidden w-full h-screen relative">
+      <canvas id="diagram-canvas" class="absolute inset-0"></canvas>
+      <div
+        id="selection-box"
+        class="absolute border-2 border-blue-400 bg-blue-400 bg-opacity-10 pointer-events-none hidden"
+      ></div>
+    </div>
+
+    <!-- Zoom Controls -->
+    <div class="zoom-controls">
+      <button
+        onclick="zoomIn()"
+        class="zoom-btn bg-gray-800 hover:bg-gray-700 text-white border border-gray-600"
+        title="Zoom In (Ctrl +)"
+      >
+        +
+      </button>
+      <button
+        onclick="zoomOut()"
+        class="zoom-btn bg-gray-800 hover:bg-gray-700 text-white border border-gray-600"
+        title="Zoom Out (Ctrl -)"
+      >
+        −
+      </button>
+      <button
+        onclick="resetView()"
+        class="zoom-btn bg-gray-800 hover:bg-gray-700 text-white border border-gray-600 text-xs"
+        title="Reset View (Ctrl 0)"
+      >
+        ⌂
+      </button>
+      <button
+        onclick="autoArrange()"
+        class="zoom-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-2"
+        title="Auto Arrange"
+      >
+        Auto
+      </button>
+      <button
+        onclick="exportDiagram()"
+        class="zoom-btn bg-green-600 hover:bg-green-700 text-white text-xs px-2"
+        title="Export as PNG"
+      >
+        📷
+      </button>
+    </div>
+
+    <!-- Search Box -->
+    <div class="fixed top-20 right-4 z-50">
+      <input
+        type="text"
+        id="search-input"
+        placeholder="Search entities..."
+        onkeyup="searchEntities(this.value)"
+        class="px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-sm text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+      />
+    </div>
+
+    <script>
+      // Global state
+      let canvas, ctx;
+      let entities = new Map();
+      let relationships = [];
+      let selectedEntities = new Set();
+      let isDragging = false;
+      let isPanning = false;
+      let isBoxSelecting = false;
+      let dragStart = { x: 0, y: 0 };
+      let boxSelectStart = { x: 0, y: 0 };
+      let camera = { x: 0, y: 0, zoom: 1 };
+      let hoveredEntity = null;
+      let mermaidData = "";
+      let animationTime = 0;
+
+      const sampleMermaid = `erDiagram
+    User ||--o{ Post : creates
+    User ||--o{ Comment : writes
+    User ||--o{ Like : gives
+    User ||--o{ SaveCollection : owns
+    User ||--o{ Follow : follows
+    User ||--o{ Follow : followed_by
+    User ||--o{ Notification : receives
+    
+    Post ||--o{ Comment : has
+    Post ||--o{ Like : receives
+    Post ||--o{ SaveCollectionItem : saved_in
+    Post ||--o{ Tag : has
+    Post ||--o{ Media : contains
+    
+    SaveCollection ||--o{ SaveCollectionItem : contains
+    
+    Category ||--o{ Post : categorizes
+    
+    User {
+        ObjectId _id PK
+        string email UK
+        string username UK
+        string password_hash
+        string full_name
+        string bio
+        string avatar_url
+        boolean is_verified
+        boolean is_active
+        datetime created_at
+        datetime updated_at
+    }
+    
+    Post {
+        ObjectId _id PK
+        ObjectId user_id FK
+        ObjectId category_id FK
+        string title
+        text content
+        string slug UK
+        string status
+        boolean is_published
+        integer view_count
+        datetime created_at
+        datetime updated_at
+    }
+    
+    Comment {
+        ObjectId _id PK
+        ObjectId post_id FK
+        ObjectId user_id FK
+        ObjectId parent_id FK
+        text content
+        datetime created_at
+        datetime updated_at
+    }
+    
+    Like {
+        ObjectId _id PK
+        ObjectId post_id FK
+        ObjectId user_id FK
+        datetime created_at
+    }
+    
+    SaveCollection {
+        ObjectId _id PK
+        ObjectId user_id FK
+        string name
+        string description
+        boolean is_public
+        integer item_count
+        datetime created_at
+        datetime updated_at
+    }
+    
+    SaveCollectionItem {
+        ObjectId _id PK
+        ObjectId collection_id FK
+        ObjectId post_id FK
+        text notes
+        integer order_index
+        datetime added_at
+    }
+    
+    Follow {
+        ObjectId _id PK
+        ObjectId follower_id FK
+        ObjectId following_id FK
+        datetime created_at
+    }
+    
+    Category {
+        ObjectId _id PK
+        string name UK
+        string slug UK
+        string description
+        integer post_count
+        datetime created_at
+    }
+    
+    Tag {
+        ObjectId _id PK
+        ObjectId post_id FK
+        string name
+        string slug
+        datetime created_at
+    }
+    
+    Media {
+        ObjectId _id PK
+        ObjectId post_id FK
+        ObjectId user_id FK
+        string type
+        string url
+        integer file_size
+        datetime created_at
+    }
+    
+    Notification {
+        ObjectId _id PK
+        ObjectId user_id FK
+        string type
+        string title
+        text message
+        boolean is_read
+        datetime created_at
+    }`;
+
+      document.addEventListener("DOMContentLoaded", async () => {
+        setupCanvas();
+        await loadMermaidData();
+        parseMermaidDiagram();
+        autoArrange();
+        setupEventListeners();
+        hideLoading();
+        render();
+        requestAnimationFrame(animationLoop);
+      });
+
+      function setupCanvas() {
+        canvas = document.getElementById("diagram-canvas");
+        ctx = canvas.getContext("2d");
+        resizeCanvas();
+        window.addEventListener("resize", resizeCanvas);
+      }
+
+      function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        render();
+      }
+
+      async function loadMermaidData() {
+        try {
+          const response = await fetch("/docs/database-schema.mermaid");
+          if (response.ok) {
+            mermaidData = await response.text();
+          } else {
+            mermaidData = sampleMermaid;
+          }
+        } catch (error) {
+          mermaidData = sampleMermaid;
+        }
+      }
+
+      function parseMermaidDiagram() {
+        const lines = mermaidData.split("\n");
+        let currentEntity = null;
+        let entityY = 100;
+        let entityX = 100;
+        let columnIndex = 0;
+
+        lines.forEach((line) => {
+          line = line.trim();
+
+          if (
+            line.includes("||--") ||
+            line.includes("}o--") ||
+            line.includes("--o{")
+          ) {
+            const match = line.match(
+              /(\w+)\s*[\|\}][\|o]-*o?[\{\|]\s*(\w+)\s*:\s*(.+)/
+            );
+            if (match) {
+              relationships.push({
+                from: match[1],
+                to: match[2],
+                label: match[3],
+                speed: 0.15 + Math.random() * (0.2 - 0.05), // random speed
+              });
+            }
+          } else if (line.match(/^\w+\s*\{$/)) {
+            const name = line.replace("{", "").trim();
+            currentEntity = {
+              name: name,
+              fields: [],
+              x: entityX,
+              y: entityY,
+              width: 220,
+              height: 40,
+              selected: false,
+              color: getEntityColor(name),
+            };
+            entities.set(name, currentEntity);
+
+            columnIndex++;
+            if (columnIndex % 3 === 0) {
+              entityX = 100;
+              entityY += 400;
+            } else {
+              entityX += 350;
+            }
+          } else if (currentEntity && line !== "}" && line !== "") {
+            const fieldMatch = line.match(/(\w+)\s+(\w+)(?:\s+(PK|FK|UK))?/);
+            if (fieldMatch) {
+              currentEntity.fields.push({
+                type: fieldMatch[1],
+                name: fieldMatch[2],
+                constraint: fieldMatch[3] || "",
+              });
+              currentEntity.height += 25;
+            }
+          } else if (line === "}") {
+            currentEntity = null;
+          }
+        });
+      }
+
+      function getEntityColor(name) {
+        if (!getEntityColor.cache) {
+          getEntityColor.cache = {};
+          getEntityColor.hues = [];
+          getEntityColor.baseHue = Math.random(); // random จุดเริ่ม hue
+        }
+
+        if (getEntityColor.cache[name]) {
+          return getEntityColor.cache[name];
+        }
+
+        const goldenRatio = 0.61803398875;
+        let h;
+
+        if (getEntityColor.hues.length === 0) {
+          h = getEntityColor.baseHue;
+        } else {
+          const lastHue =
+            getEntityColor.hues[getEntityColor.hues.length - 1] / 360;
+          h = (lastHue + goldenRatio) % 1;
+        }
+
+        const minDistance = 18; // องศา – กันไม่ให้สีใกล้กันเกินไป
+        let attempts = 0;
+        let hueDeg;
+
+        while (attempts < 30) {
+          hueDeg = Math.round(h * 360);
+          const tooClose = getEntityColor.hues.some((prev) => {
+            const d = Math.abs(prev - hueDeg);
+            return Math.min(d, 360 - d) < minDistance;
+          });
+
+          if (!tooClose) {
+            break;
+          }
+
+          h = (h + goldenRatio) % 1;
+          attempts++;
+        }
+
+        getEntityColor.hues.push(hueDeg);
+
+        const saturation = 65;
+        const lightness = 55;
+        const color = `hsl(${hueDeg}, ${saturation}%, ${lightness}%)`;
+
+        getEntityColor.cache[name] = color;
+        return color;
+      }
+
+      function setupEventListeners() {
+        canvas.addEventListener("mousedown", handleMouseDown);
+        canvas.addEventListener("mousemove", handleMouseMove);
+        canvas.addEventListener("mouseup", handleMouseUp);
+        canvas.addEventListener("wheel", handleWheel);
+        canvas.addEventListener("dblclick", handleDoubleClick);
+        canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+
+        document.addEventListener("keydown", handleKeyDown);
+        document.addEventListener("keyup", handleKeyUp);
+      }
+
+      function handleMouseDown(e) {
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left - camera.x) / camera.zoom;
+        const y = (e.clientY - rect.top - camera.y) / camera.zoom;
+
+        dragStart = { x, y };
+
+        const clickedEntity = getEntityAt(x, y);
+
+        if (e.shiftKey) {
+          isBoxSelecting = true;
+          boxSelectStart = { x, y };
+        } else if (e.spaceKey || e.button === 1) {
+          isPanning = true;
+          canvas.style.cursor = "grabbing";
+        } else if (clickedEntity) {
+          if (e.ctrlKey || e.metaKey) {
+            if (selectedEntities.has(clickedEntity.name)) {
+              selectedEntities.delete(clickedEntity.name);
+            } else {
+              selectedEntities.add(clickedEntity.name);
+            }
+          } else if (!selectedEntities.has(clickedEntity.name)) {
+            selectedEntities.clear();
+            selectedEntities.add(clickedEntity.name);
+          }
+          isDragging = true;
+          updateSelectionInfo();
+        } else {
+          if (!e.ctrlKey && !e.metaKey) {
+            selectedEntities.clear();
+            updateSelectionInfo();
+          }
+        }
+
+        render();
+      }
+
+      function handleMouseMove(e) {
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left - camera.x) / camera.zoom;
+        const y = (e.clientY - rect.top - camera.y) / camera.zoom;
+
+        const prevHovered = hoveredEntity;
+        hoveredEntity = getEntityAt(x, y);
+        if (prevHovered !== hoveredEntity) {
+          canvas.style.cursor = hoveredEntity ? "pointer" : "default";
+          render();
+        }
+
+        if (isDragging && selectedEntities.size > 0) {
+          const dx = x - dragStart.x;
+          const dy = y - dragStart.y;
+
+          selectedEntities.forEach((name) => {
+            const entity = entities.get(name);
+            if (entity) {
+              entity.x += dx;
+              entity.y += dy;
+            }
+          });
+
+          dragStart = { x, y };
+          render();
+        } else if (isPanning) {
+          camera.x += e.movementX;
+          camera.y += e.movementY;
+          render();
+        } else if (isBoxSelecting) {
+          updateBoxSelection(x, y);
+          render();
+        }
+      }
+
+      function handleMouseUp(e) {
+        if (isBoxSelecting) {
+          const rect = canvas.getBoundingClientRect();
+          const x = (e.clientX - rect.left - camera.x) / camera.zoom;
+          const y = (e.clientY - rect.top - camera.y) / camera.zoom;
+          selectEntitiesInBox(boxSelectStart.x, boxSelectStart.y, x, y);
+          hideBoxSelection();
+        }
+
+        isDragging = false;
+        isPanning = false;
+        isBoxSelecting = false;
+        canvas.style.cursor = "default";
+        render();
+      }
+
+      function handleWheel(e) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        camera.x = x - (x - camera.x) * delta;
+        camera.y = y - (y - camera.y) * delta;
+        camera.zoom *= delta;
+        camera.zoom = Math.max(0.1, Math.min(5, camera.zoom));
+
+        render();
+      }
+
+      function handleDoubleClick(e) {
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left - camera.x) / camera.zoom;
+        const y = (e.clientY - rect.top - camera.y) / camera.zoom;
+
+        const entity = getEntityAt(x, y);
+        if (entity) {
+          focusEntity(entity);
+        }
+      }
+
+      function handleKeyDown(e) {
+        if (e.key === "Escape") {
+          selectedEntities.clear();
+          updateSelectionInfo();
+          render();
+        } else if (e.key === " ") {
+          e.spaceKey = true;
+          canvas.style.cursor = "grab";
+        } else if (e.ctrlKey || e.metaKey) {
+          if (e.key === "a") {
+            e.preventDefault();
+            entities.forEach((_, name) => selectedEntities.add(name));
+            updateSelectionInfo();
+            render();
+          } else if (e.key === "0") {
+            e.preventDefault();
+            resetView();
+          }
+        }
+      }
+
+      function handleKeyUp(e) {
+        if (e.key === " ") {
+          e.spaceKey = false;
+          canvas.style.cursor = "default";
+        }
+      }
+
+      function getEntityAt(x, y) {
+        for (const [name, entity] of entities) {
+          if (
+            x >= entity.x &&
+            x <= entity.x + entity.width &&
+            y >= entity.y &&
+            y <= entity.y + entity.height
+          ) {
+            return entity;
+          }
+        }
+        return null;
+      }
+
+      function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.save();
+        ctx.translate(camera.x, camera.y);
+        ctx.scale(camera.zoom, camera.zoom);
+
+        drawGrid();
+
+        relationships.forEach((rel) => drawRelationship(rel));
+
+        entities.forEach((entity) => drawEntity(entity));
+
+        ctx.restore();
+
+        if (isBoxSelecting) {
+          drawBoxSelection();
+        }
+      }
+
+      function drawGrid() {
+        ctx.strokeStyle = "rgba(75, 85, 99, 0.1)";
+        ctx.lineWidth = 1;
+        const gridSize = 50;
+        const startX =
+          Math.floor(-camera.x / camera.zoom / gridSize) * gridSize;
+        const startY =
+          Math.floor(-camera.y / camera.zoom / gridSize) * gridSize;
+        const endX = startX + canvas.width / camera.zoom + gridSize;
+        const endY = startY + canvas.height / camera.zoom + gridSize;
+
+        for (let x = startX; x < endX; x += gridSize) {
+          ctx.beginPath();
+          ctx.moveTo(x, startY);
+          ctx.lineTo(x, endY);
+          ctx.stroke();
+        }
+
+        for (let y = startY; y < endY; y += gridSize) {
+          ctx.beginPath();
+          ctx.moveTo(startX, y);
+          ctx.lineTo(endX, y);
+          ctx.stroke();
+        }
+      }
+
+      function drawEntity(entity) {
+        const isSelected = selectedEntities.has(entity.name);
+        const isHovered = hoveredEntity === entity;
+
+        if (isSelected || isHovered) {
+          ctx.shadowColor = isSelected
+            ? "rgba(59, 130, 246, 0.5)"
+            : "rgba(255, 255, 255, 0.2)";
+          ctx.shadowBlur = 15;
+        }
+
+        ctx.fillStyle = document.documentElement.classList.contains("dark")
+          ? "#1f2937"
+          : "#f3f4f6";
+        ctx.strokeStyle = isSelected
+          ? "#3b82f6"
+          : isHovered
+          ? "#6b7280"
+          : "#4b5563";
+        ctx.lineWidth = isSelected ? 3 : 2;
+        ctx.beginPath();
+        ctx.roundRect(entity.x, entity.y, entity.width, entity.height, 8);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.shadowColor = "transparent";
+        ctx.shadowBlur = 0;
+
+        ctx.fillStyle = entity.color;
+        ctx.globalAlpha = 0.9;
+        ctx.beginPath();
+        ctx.roundRect(entity.x, entity.y, entity.width, 35, [8, 8, 0, 0]);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 14px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(entity.name, entity.x + entity.width / 2, entity.y + 17);
+
+        ctx.fillStyle = document.documentElement.classList.contains("dark")
+          ? "#9ca3af"
+          : "#4b5563";
+        ctx.font = "12px monospace";
+        ctx.textAlign = "left";
+
+        entity.fields.forEach((field, index) => {
+          const y = entity.y + 35 + (index + 1) * 20;
+          let fieldText = `${field.type} ${field.name}`;
+
+          if (field.constraint) {
+            ctx.fillStyle =
+              field.constraint === "PK"
+                ? "#fbbf24"
+                : field.constraint === "FK"
+                ? "#60a5fa"
+                : "#a78bfa";
+            ctx.font = "bold 10px sans-serif";
+            ctx.fillText(field.constraint, entity.x + entity.width - 30, y);
+            ctx.fillStyle = document.documentElement.classList.contains("dark")
+              ? "#9ca3af"
+              : "#4b5563";
+            ctx.font = "12px monospace";
+          }
+
+          ctx.fillText(fieldText, entity.x + 10, y);
+        });
+      }
+
+      function drawRelationship(rel) {
+        const fromEntity = entities.get(rel.from);
+        const toEntity = entities.get(rel.to);
+
+        if (!fromEntity || !toEntity) return;
+
+        const from = getConnectionPoint(fromEntity, toEntity);
+        const to = getConnectionPoint(toEntity, fromEntity);
+
+        const dx = to.x - from.x;
+        const dy = to.y - from.y;
+        const cx = from.x + dx / 2;
+        const cy = from.y + dy / 2;
+
+        const lineColor = fromEntity.color;
+
+        ctx.strokeStyle = "rgba(107, 114, 128, 0.4)";
+        ctx.globalAlpha = 0.55;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.y);
+        ctx.quadraticCurveTo(cx, cy, to.x, to.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        const angle = Math.atan2(to.y - cy, to.x - cx);
+        ctx.save();
+        ctx.translate(to.x, to.y);
+        ctx.rotate(angle);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(-10, -5);
+        ctx.lineTo(-10, 5);
+        ctx.closePath();
+        ctx.fillStyle = lineColor;
+        ctx.globalAlpha = 0.45;
+        ctx.globalAlpha = 1;
+        ctx.fill();
+        ctx.restore();
+
+        ctx.fillStyle = lineColor;
+        ctx.globalAlpha = 1;
+        ctx.font = "11px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(rel.label, cx, cy - 5);
+
+        const phase = ((rel.label ? rel.label.length : 0) % 10) / 10;
+        const speed = rel.speed || 0.25; // fallback เผื่อไฟล์เก่า
+        const t = (animationTime * speed + phase) % 1;
+        const oneMinusT = 1 - t;
+
+        const signalX =
+          oneMinusT * oneMinusT * from.x +
+          2 * oneMinusT * t * cx +
+          t * t * to.x;
+        const signalY =
+          oneMinusT * oneMinusT * from.y +
+          2 * oneMinusT * t * cy +
+          t * t * to.y;
+
+        ctx.save();
+        ctx.fillStyle = lineColor;
+        ctx.shadowColor = lineColor;
+        ctx.shadowBlur = 15;
+        ctx.beginPath();
+        ctx.arc(signalX, signalY, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function getConnectionPoint(fromEntity, toEntity) {
+        const fromCenter = {
+          x: fromEntity.x + fromEntity.width / 2,
+          y: fromEntity.y + fromEntity.height / 2,
+        };
+        const toCenter = {
+          x: toEntity.x + toEntity.width / 2,
+          y: toEntity.y + toEntity.height / 2,
+        };
+
+        const angle = Math.atan2(
+          toCenter.y - fromCenter.y,
+          toCenter.x - fromCenter.x
+        );
+
+        if (Math.abs(angle) < Math.PI / 4) {
+          return { x: fromEntity.x + fromEntity.width, y: fromCenter.y };
+        } else if (Math.abs(angle) > (3 * Math.PI) / 4) {
+          return { x: fromEntity.x, y: fromCenter.y };
+        } else if (angle > 0) {
+          return { x: fromCenter.x, y: fromEntity.y + fromEntity.height };
+        } else {
+          return { x: fromCenter.x, y: fromEntity.y };
+        }
+      }
+
+      function updateBoxSelection(x, y) {
+        const box = document.getElementById("selection-box");
+        const rect = canvas.getBoundingClientRect();
+
+        const startX = Math.min(boxSelectStart.x, x) * camera.zoom + camera.x;
+        const startY = Math.min(boxSelectStart.y, y) * camera.zoom + camera.y;
+        const width = Math.abs(x - boxSelectStart.x) * camera.zoom;
+        const height = Math.abs(y - boxSelectStart.y) * camera.zoom;
+
+        box.style.left = `${rect.left + startX}px`;
+        box.style.top = `${rect.top + startY}px`;
+        box.style.width = `${width}px`;
+        box.style.height = `${height}px`;
+        box.classList.remove("hidden");
+      }
+
+      function hideBoxSelection() {
+        document.getElementById("selection-box").classList.add("hidden");
+      }
+
+      function selectEntitiesInBox(x1, y1, x2, y2) {
+        const minX = Math.min(x1, x2);
+        const maxX = Math.max(x1, x2);
+        const minY = Math.min(y1, y2);
+        const maxY = Math.max(y1, y2);
+
+        entities.forEach((entity, name) => {
+          if (
+            entity.x < maxX &&
+            entity.x + entity.width > minX &&
+            entity.y < maxY &&
+            entity.y + entity.height > minY
+          ) {
+            selectedEntities.add(name);
+          }
+        });
+
+        updateSelectionInfo();
+      }
+
+      function drawBoxSelection() {}
+
+      function focusEntity(entity) {
+        const centerX = entity.x + entity.width / 2;
+        const centerY = entity.y + entity.height / 2;
+
+        camera.x = canvas.width / 2 - centerX * camera.zoom;
+        camera.y = canvas.height / 2 - centerY * camera.zoom;
+
+        selectedEntities.clear();
+        selectedEntities.add(entity.name);
+        updateSelectionInfo();
+        render();
+      }
+
+      function updateSelectionInfo() {
+        const panel = document.getElementById("selection-info");
+        const list = document.getElementById("selected-list");
+
+        if (selectedEntities.size > 0) {
+          panel.classList.remove("hidden");
+          const names = Array.from(selectedEntities);
+          list.innerHTML = names.map((name) => `• ${name}`).join("<br>");
+        } else {
+          panel.classList.add("hidden");
+        }
+      }
+
+      function clearSelection() {
+        selectedEntities.clear();
+        updateSelectionInfo();
+        render();
+      }
+
+      function alignSelected(direction) {
+        if (selectedEntities.size < 2) return;
+
+        const selectedEntitiesList = Array.from(selectedEntities).map((name) =>
+          entities.get(name)
+        );
+
+        if (direction === "horizontal") {
+          const avgY =
+            selectedEntitiesList.reduce((sum, e) => sum + e.y, 0) /
+            selectedEntitiesList.length;
+          selectedEntitiesList.forEach((entity) => (entity.y = avgY));
+        } else {
+          const avgX =
+            selectedEntitiesList.reduce((sum, e) => sum + e.x, 0) /
+            selectedEntitiesList.length;
+          selectedEntitiesList.forEach((entity) => (entity.x = avgX));
+        }
+
+        render();
+      }
+
+      function autoArrange() {
+        camera = { x: 0, y: 0, zoom: 1 };
+
+        const allEntities = Array.from(entities.values());
+        if (!allEntities.length) {
+          render();
+          return;
+        }
+
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+
+        const degree = new Map();
+        relationships.forEach((rel) => {
+          degree.set(rel.from, (degree.get(rel.from) || 0) + 1);
+          degree.set(rel.to, (degree.get(rel.to) || 0) + 1);
+        });
+
+        const connected = [];
+        const isolated = [];
+
+        allEntities.forEach((e) => {
+          if ((degree.get(e.name) || 0) > 0) connected.push(e);
+          else isolated.push(e);
+        });
+
+        if (connected.length === 0) {
+          const padding = 60;
+          const cols = Math.ceil(Math.sqrt(isolated.length || 1));
+          const rows = Math.ceil(isolated.length / cols);
+          const totalWidth = cols * (isolated[0].width + padding);
+          const totalHeight = rows * (isolated[0].height + padding);
+          const startX = centerX - totalWidth / 2;
+          const startY = centerY - totalHeight / 2;
+
+          isolated.forEach((entity, index) => {
+            const col = index % cols;
+            const row = Math.floor(index / cols);
+            entity.x = startX + col * (entity.width + padding);
+            entity.y = startY + row * (entity.height + padding);
+          });
+
+          resolveCollisions();
+          render();
+          return;
+        }
+
+        const n = connected.length;
+        const baseRadius = 360;
+        const radius = baseRadius + n * 22;
+        const jitterPower = 120;
+
+        connected.sort(
+          (a, b) => (degree.get(b.name) || 0) - (degree.get(a.name) || 0)
+        );
+
+        connected.forEach((entity, index) => {
+          if (index === 0) {
+            entity.x = centerX - entity.width / 2;
+            entity.y = centerY - entity.height / 2;
+            return;
+          }
+
+          const angle = ((index - 1) / (n - 1)) * Math.PI * 2;
+
+          const jitterX = (Math.random() - 0.5) * jitterPower;
+          const jitterY = (Math.random() - 0.5) * jitterPower;
+
+          entity.x =
+            centerX + radius * Math.cos(angle) + jitterX - entity.width / 2;
+
+          entity.y =
+            centerY + radius * Math.sin(angle) + jitterY - entity.height / 2;
+        });
+
+        if (isolated.length > 0) {
+          const padding = 55;
+          const cols = Math.ceil(Math.sqrt(isolated.length));
+
+          const clusterOffset = radius * 1.15;
+          const clusterCenterX = centerX + clusterOffset * 0.8;
+          const clusterCenterY = centerY + clusterOffset * 0.25;
+
+          const first = isolated[0];
+          const totalWidth = cols * (first.width + padding);
+          const rows = Math.ceil(isolated.length / cols);
+          const totalHeight = rows * (first.height + padding);
+
+          const startX = clusterCenterX - totalWidth / 2;
+          const startY = clusterCenterY - totalHeight / 2;
+
+          isolated.forEach((entity, index) => {
+            const col = index % cols;
+            const row = Math.floor(index / cols);
+
+            entity.x = startX + col * (entity.width + padding);
+            entity.y = startY + row * (entity.height + padding);
+          });
+        }
+
+        resolveCollisions();
+        render();
+      }
+
+      function resolveCollisions() {
+        const entityList = Array.from(entities.values());
+
+        for (let iter = 0; iter < 22; iter++) {
+          let moved = false;
+
+          for (let i = 0; i < entityList.length; i++) {
+            for (let j = i + 1; j < entityList.length; j++) {
+              const a = entityList[i];
+              const b = entityList[j];
+
+              if (
+                a.x < b.x + b.width &&
+                a.x + a.width > b.x &&
+                a.y < b.y + b.height &&
+                a.y + a.height > b.y
+              ) {
+                const dx = a.x + a.width / 2 - (b.x + b.width / 2);
+                const dy = a.y + a.height / 2 - (b.y + b.height / 2);
+                const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+                const push = 18;
+
+                const ux = dx / dist;
+                const uy = dy / dist;
+
+                a.x += ux * push;
+                a.y += uy * push;
+                b.x -= ux * push;
+                b.y -= uy * push;
+
+                moved = true;
+              }
+            }
+          }
+
+          if (!moved) break;
+        }
+      }
+
+      function searchEntities(query) {
+        if (!query) {
+          selectedEntities.clear();
+        } else {
+          selectedEntities.clear();
+          entities.forEach((entity, name) => {
+            if (name.toLowerCase().includes(query.toLowerCase())) {
+              selectedEntities.add(name);
+            }
+          });
+        }
+
+        updateSelectionInfo();
+        render();
+
+        if (selectedEntities.size > 0) {
+          const firstMatch = entities.get(Array.from(selectedEntities)[0]);
+          if (firstMatch) focusEntity(firstMatch);
+        }
+      }
+
+      function exportDiagram() {
+        const exportCanvas = document.createElement("canvas");
+        const exportCtx = exportCanvas.getContext("2d");
+
+        let minX = Infinity,
+          minY = Infinity,
+          maxX = -Infinity,
+          maxY = -Infinity;
+        entities.forEach((entity) => {
+          minX = Math.min(minX, entity.x);
+          minY = Math.min(minY, entity.y);
+          maxX = Math.max(maxX, entity.x + entity.width);
+          maxY = Math.max(maxY, entity.y + entity.height);
+        });
+
+        const padding = 50;
+        exportCanvas.width = maxX - minX + padding * 2;
+        exportCanvas.height = maxY - minY + padding * 2;
+
+        exportCtx.fillStyle = "#ffffff";
+        exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+
+        exportCtx.translate(padding - minX, padding - minY);
+
+        relationships.forEach((rel) => {
+          const fromEntity = entities.get(rel.from);
+          const toEntity = entities.get(rel.to);
+          if (fromEntity && toEntity) {
+            const originalCtx = ctx;
+            ctx = exportCtx;
+            drawRelationship(rel);
+            ctx = originalCtx;
+          }
+        });
+
+        entities.forEach((entity) => {
+          const originalCtx = ctx;
+          ctx = exportCtx;
+          drawEntity(entity);
+          ctx = originalCtx;
+        });
+
+        exportCanvas.toBlob((blob) => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "er-diagram.png";
+          a.click();
+          URL.revokeObjectURL(url);
+        });
+      }
+
+      function zoomIn() {
+        camera.zoom *= 1.2;
+        camera.zoom = Math.min(5, camera.zoom);
+        render();
+      }
+
+      function zoomOut() {
+        camera.zoom *= 0.8;
+        camera.zoom = Math.max(0.1, camera.zoom);
+        render();
+      }
+
+      function resetView() {
+        camera = { x: 0, y: 0, zoom: 1 };
+        render();
+      }
+
+      function toggleTheme() {
+        const html = document.documentElement;
+        const themeIcon = document.getElementById("theme-icon");
+
+        if (html.classList.contains("dark")) {
+          html.classList.remove("dark");
+          themeIcon.textContent = "☀️";
+        } else {
+          html.classList.add("dark");
+          themeIcon.textContent = "🌙";
+        }
+
+        render();
+      }
+
+      function toggleInstructions() {
+        const instructions = document.getElementById("instructions");
+        instructions.classList.toggle("hidden");
+      }
+
+      function hideLoading() {
+        document.getElementById("loading").classList.add("hidden");
+        document.getElementById("canvas-container").classList.remove("hidden");
+      }
+
+      function animationLoop(timestamp) {
+        animationTime = timestamp / 1000;
+        render();
+        requestAnimationFrame(animationLoop);
+      }
+
+      if (!CanvasRenderingContext2D.prototype.roundRect) {
+        CanvasRenderingContext2D.prototype.roundRect = function (
+          x,
+          y,
+          width,
+          height,
+          radii
+        ) {
+          if (typeof radii === "number") {
+            radii = [radii, radii, radii, radii];
+          } else if (Array.isArray(radii) && radii.length === 2) {
+            radii = [radii[0], radii[1], radii[0], radii[1]];
+          }
+
+          this.beginPath();
+          this.moveTo(x + radii[0], y);
+          this.lineTo(x + width - radii[1], y);
+          this.quadraticCurveTo(x + width, y, x + width, y + radii[1]);
+          this.lineTo(x + width, y + height - radii[2]);
+          this.quadraticCurveTo(
+            x + width,
+            y + height,
+            x + width - radii[2],
+            y + height
+          );
+          this.lineTo(x + radii[3], y + height);
+          this.quadraticCurveTo(x, y + height, x, y + height - radii[3]);
+          this.lineTo(x, y + radii[0]);
+          this.quadraticCurveTo(x, y, x + radii[0], y);
+          this.closePath();
+        };
+      }
+    </script>
+
+    <style>
+      .dot-grid {
+        background-image: radial-gradient(
+          circle,
+          rgba(107, 114, 128, 0.05) 1px,
+          transparent 1px
+        );
+        background-size: 20px 20px;
+        background-position: 0 0, 10px 10px;
+      }
+
+      .dark .dot-grid {
+        background-image: radial-gradient(
+          circle,
+          rgba(156, 163, 175, 0.05) 1px,
+          transparent 1px
+        );
+      }
+
+      .zoom-controls {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 50;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .zoom-btn {
+        min-width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        font-weight: bold;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        user-select: none;
+        padding: 0 10px;
+      }
+
+      #diagram-canvas {
+        cursor: crosshair;
+      }
+
+      #diagram-canvas.grabbing {
+        cursor: grabbing !important;
+      }
+
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: #374151;
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background: #6b7280;
+        border-radius: 4px;
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background: #9ca3af;
+      }
+
+      html:not(.dark) ::-webkit-scrollbar-track {
+        background: #f1f5f9;
+      }
+
+      html:not(.dark) ::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+      }
+    </style>
+  </body>
+</html>

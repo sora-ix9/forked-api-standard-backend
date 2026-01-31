@@ -1,0 +1,40 @@
+---
+title: Database Schema Diagram
+description: |
+  ## Database schema for API Standard Backend
+
+  This diagram represents the current database structure based on the internal models:
+  - **User Management**: Authentication and Roles
+
+config:
+    layout: elk
+    er:
+        diagramPadding: 25
+        entityPadding: 20
+        relationshipPadding: 15
+        minEntityWidth: 150
+        minEntityHeight: 120
+---
+
+erDiagram
+    %% User Management Relationships
+    Users }|--|| Role : has_role
+
+    Users {
+        UUID ID PK "Primary Key"
+        string Username UK "Unique, Not Null"
+        string Email UK "Unique, Not Null"
+        string Fisrtname "First Name"
+        string Password "Not Null"
+        UUID RoleID FK "Foreign Key -> Role.ID"
+        timestamp CreatedAt
+        timestamp UpdatedAt
+    }
+
+    Role {
+        UUID ID PK "Primary Key"
+        string Name UK "Unique, Not Null"
+        string Description
+        timestamp CreatedAt
+        timestamp UpdatedAt
+    }

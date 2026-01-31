@@ -1,0 +1,372 @@
+openapi: 3.0.0
+info:
+  title: API Standard Backend
+  version: 1.0.0
+  description: API documentation for Standard Backend
+servers:
+  - url: http://localhost:1323
+    description: Local server
+paths:
+  /:
+    get:
+      summary: Health Check
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "fdlp Standard API Status:Online"
+
+  /user/create-user:
+    post:
+      summary: Create a new user
+      tags:
+        - User (Public)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequestBody'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponseUser'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /user/login:
+    post:
+      summary: Login user
+      tags:
+        - User (Public)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginUserRequestBody'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponseToken'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /role:
+    get:
+      summary: Get role by ID
+      tags:
+        - Role
+      parameters:
+        - in: query
+          name: id
+          schema:
+            type: string
+          required: true
+          description: Role ID
+      responses:
+        '200':
+          description: Role found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponseRole'
+        '404':
+          description: Role not found
+
+  /role/create-role:
+    post:
+      summary: Create a new role
+      tags:
+        - Role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRoleRequestBody'
+      responses:
+        '201':
+          description: Role created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponseRole'
+
+  /v1/user/{id}:
+    get:
+      summary: Get user by ID (Admin only)
+      tags:
+        - User (Protected)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+          description: User ID
+      responses:
+        '200':
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponseUserGetById'
+        '404':
+          description: User not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/users:
+    get:
+      summary: Get all users with pagination (Admin only)
+      tags:
+        - User (Protected)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+        - in: query
+          name: filterBy
+          schema:
+            type: string
+        - in: query
+          name: filterValue
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Users list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponseUserList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/user/create:
+    post:
+      summary: Create user with role (Admin only)
+      tags:
+        - User (Protected)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserWithRoleRequestBody'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponseUser'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    StandardResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        data:
+          type: object
+        error:
+          type: object
+
+    StandardResponseUser:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+        - properties:
+            data:
+              $ref: '#/components/schemas/User'
+
+    StandardResponseRole:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+        - properties:
+            data:
+              $ref: '#/components/schemas/Role'
+
+    StandardResponseToken:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+        - properties:
+            data:
+              type: string
+
+    StandardResponseUserGetById:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+        - properties:
+            data:
+              $ref: '#/components/schemas/UserGetByIdResponse'
+
+    StandardResponseUserList:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+        - properties:
+            data:
+              type: object
+              properties:
+                users:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/User'
+                totalRows:
+                  type: integer
+                totalPages:
+                  type: integer
+
+    CreateUserRequestBody:
+      type: object
+      required: [username, email, password]
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    LoginUserRequestBody:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    CreateUserWithRoleRequestBody:
+      type: object
+      required: [username, email, password, role_name]
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        role_name:
+          type: string
+
+    CreateRoleRequestBody:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+
+    UserGetByIdResponse:
+      type: object
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+        role_name:
+          type: string
+        role_description:
+          type: string
+
+    User:
+      type: object
+      properties:
+        ID:
+          type: string
+          format: uuid
+        Username:
+          type: string
+        Email:
+          type: string
+        Fisrtname:
+          type: string
+        RoleID:
+          type: string
+          format: uuid
+        Role:
+          $ref: '#/components/schemas/Role'
+        CreatedAt:
+          type: string
+          format: date-time
+        UpdatedAt:
+          type: string
+          format: date-time
+
+    Role:
+      type: object
+      properties:
+        ID:
+          type: string
+          format: uuid
+        Name:
+          type: string
+        Description:
+          type: string
+        CreatedAt:
+          type: string
+          format: date-time
+        UpdatedAt:
+          type: string
+          format: date-time
+
+  responses:
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+             $ref: '#/components/schemas/StandardResponse'
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+             $ref: '#/components/schemas/StandardResponse'
+    InternalServerError:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema:
+             $ref: '#/components/schemas/StandardResponse'
