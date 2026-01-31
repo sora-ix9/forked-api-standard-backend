@@ -14,46 +14,114 @@ Fakduai Standard Project for API
 ## Project Structure
 
 ```bash
-/src
-|-- /cmd
-|   |-- main.go                     # Entry point for the application.
-|-- /internal
-|   |-- /dto
-|       |-- user_data.go            # Data transfer objects.
-|   |-- /echo
-|       |-- server.go               # Echo framework setup.
-|   |-- /handler
-|       |-- user_handler.go         # HTTP handlers for user operations.
-|   |-- /middlewares
-|       |-- role_middleware.go      # Middleware for role checking.
-|   |-- /models
-|       |-- user.go                 # User model definition.
-|       |-- role.go                 # Role model definition.
-|   |-- /repositories
-|       |-- user_repository.go      # User repositories for DB operations.
-|   |-- /services
-|       |-- user_service.go         # Business logic for user management.
-|   |-- /types
-|       |-- uuid.go                 # Type definitions, such as UUID.
-|   |-- /util
-|       |-- response.go             # Utility function for response with standard format.
-|   |-- /tests                      # Unit and Integration Tests
-|       |-- /handlers               # Unit tests for handlers
-|       |-- /services               # Unit tests for services
-|       |-- /integration            # Integration tests
-|       |-- /mock                   # Mocks for unit testing
-|-- /pkg
-|   |-- /config
-|       |-- config.go               # Configuration setup.
-|-- /db
-|   |-- /db.go                      # Database connection and setup.
-|-- /redisclient
-|   |-- /redisclient.go             # Redis client configuration.
-|-- go.mod                          # Go module dependencies.
-|-- go.sum                          # Go module checksums.
-|-- .env                            # Environment variables.
-|-- README.md                       # This file.
-
+.
+├── api-collection                  # Postman/Rest Client collection files
+│   ├── helpcheck.http
+│   ├── role.http
+│   └── user.http
+├── cmd
+│   ├── main.go                     # Application entry point
+│   └── tools.go
+├── credentials                     # Service account credentials (ignored by git)
+├── docs                            # Project documentation
+│   ├── database-schema.html
+│   ├── database-schema.mermaid
+│   └── swagger.yaml
+├── internal
+│   ├── dto                         # Data Transfer Objects
+│   │   ├── jwt_data.go
+│   │   ├── role_data.go
+│   │   ├── standard_response_data.go
+│   │   └── user_data.go
+│   ├── echo
+│   │   └── server.go               # Echo server configuration
+│   ├── handler                     # HTTP Request Handlers
+│   │   ├── role_handler.go
+│   │   ├── user_handler.go
+│   │   └── websocket_handler.go
+│   ├── middlewares                 # Custom Middlewares
+│   │   ├── jwtauth_middleware.go
+│   │   ├── request_log_middleware.go
+│   │   └── role_middleware.go
+│   ├── models                      # Domain Models
+│   │   ├── role.go
+│   │   └── user.go
+│   ├── repositories                # Data Access Layer
+│   │   ├── role_repository.go
+│   │   └── user_repository.go
+│   ├── routes                      # Route Registrations
+│   │   ├── role_routes.go
+│   │   └── user_routes.go
+│   ├── services                    # Business Logic Layer
+│   │   ├── role_service.go
+│   │   ├── user_service.go
+│   │   └── websocket_service.go
+│   ├── tests                       # Tests (Unit & Integration)
+│   │   ├── handlers                # Handler Unit Tests
+│   │   │   ├── role_handler_test.go
+│   │   │   ├── user_handler_test.go
+│   │   │   └── websocket_handler_test.go
+│   │   ├── integration             # Integration Tests
+│   │   │   ├── role_routes_test.go
+│   │   │   ├── setup_test.go
+│   │   │   └── user_routes_test.go
+│   │   ├── mock                    # Mocks for Testing
+│   │   │   ├── repositories
+│   │   │   │   ├── role_repository_mock.go
+│   │   │   │   └── user_repository_mock.go
+│   │   │   └── services
+│   │   │       ├── role_service_mock.go
+│   │   │       ├── user_service_mock.go
+│   │   │       └── websocket_service_mock.go
+│   │   └── services                # Service Unit Tests
+│   │       ├── role_service_test.go
+│   │       ├── user_service_test.go
+│   │       └── websocket_service_test.go
+│   ├── types                       # Type Definitions
+│   │   └── uuid.go
+│   └── utils                       # Utilities
+│       ├── response.go
+│       └── timeutil.go
+├── k6_loadtest                     # Load Testing Scripts
+│   ├── README.md
+│   └── k6_loadtest.js
+├── migrations                      # Database Migrations
+│   ├── 20240427172736.sql
+│   ├── 20240427173848.sql
+│   ├── 20240502084112.sql
+│   └── atlas.sum
+├── pkg                             # Public Library Code
+│   ├── config                      # Configuration Loading
+│   │   └── config.go
+│   ├── db                          # Database Connection
+│   │   └── db.go
+│   ├── providers                   # External Service Providers
+│   │   ├── email
+│   │   │   └── email.go
+│   │   ├── firebase
+│   │   │   └── firebase.go
+│   │   ├── httpclient
+│   │   │   └── httpclient.go
+│   │   ├── logger
+│   │   │   └── logger.go
+│   │   ├── mongodb
+│   │   │   └── mongodb.go
+│   │   ├── s3
+│   │   │   └── s3.go
+│   │   ├── stripe
+│   │   │   └── stripe.go
+│   │   └── taskqueue
+│   │       └── taskqueue.go
+│   └── redisclient                 # Redis Client
+│       └── redisclient.go
+├── Dockerfile.dev
+├── Dockerfile.prod
+├── LICENSE
+├── README.md
+├── atlas.hcl
+├── coverage.out
+├── go.mod
+└── go.sum
 ```
 
 ## Setup
