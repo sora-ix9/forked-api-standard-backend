@@ -19,6 +19,60 @@ paths:
                 type: string
                 example: "fdlp Standard API Status:Online"
 
+  /health-mongo:
+    get:
+      summary: MongoDB Health Check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: fail
+                  error:
+                    type: string
+
+  /health-redis:
+    get:
+      summary: Redis Health Check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: fail
+                  error:
+                    type: string
+
   /user/create-user:
     post:
       summary: Create a new user
@@ -313,7 +367,7 @@ components:
     User:
       type: object
       properties:
-        ID:
+        UserID:
           type: string
           format: uuid
         Username:
@@ -337,7 +391,7 @@ components:
     Role:
       type: object
       properties:
-        ID:
+        RoleID:
           type: string
           format: uuid
         Name:
