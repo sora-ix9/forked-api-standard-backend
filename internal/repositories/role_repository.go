@@ -1,42 +1,56 @@
 package repositories
 
 import (
+	"context"
 	"fdlp-standard-api/internal/models"
+	"time"
 
-	"gorm.io/gorm"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type RoleRepository interface {
 	GetById(id string) (*models.Role, error)
 	GetByName(name string) (*models.Role, error)
-	Create(user *models.Role) error
-	CreateWithTransaction(tx *gorm.DB, role *models.Role) error
+	Create(role *models.Role) error
 }
 
 type roleRepository struct {
-	db *gorm.DB
+	db *mongo.Database
 }
 
-func NewRoleRepository(db *gorm.DB) RoleRepository {
+func NewRoleRepository(db *mongo.Database) RoleRepository {
 	return &roleRepository{db: db}
 }
 
 func (repo *roleRepository) GetById(id string) (*models.Role, error) {
 	var role models.Role
-	result := repo.db.Where("id = ?", id).First(&role)
-	return &role, result.Error
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := repo.db.Collection("roles").FindOne(ctx, bson.M{"role_id": id}).Decode(&role)
+	if err != nil {
+		return nil, err
+	}
+	return &role, nil
 }
 
 func (repo *roleRepository) GetByName(name string) (*models.Role, error) {
 	var role models.Role
-	result := repo.db.Where(&models.Role{Name: name}).First(&role)
-	return &role, result.Error
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := repo.db.Collection("roles").FindOne(ctx, bson.M{"name": name}).Decode(&role)
+	if err != nil {
+		return nil, err
+	}
+	return &role, nil
 }
 
 func (repo *roleRepository) Create(role *models.Role) error {
-	return repo.db.Create(role).Error
-}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-func (repo *roleRepository) CreateWithTransaction(tx *gorm.DB, role *models.Role) error {
-	return tx.Create(role).Error
+	_, err := repo.db.Collection("roles").InsertOne(ctx, role)
+	return err
 }

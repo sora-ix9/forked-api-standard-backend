@@ -1,5 +1,5 @@
 # Use the official Golang Alpine image to create a build artifact.
-FROM golang:1.22 as builder
+FROM golang:1.26 as builder
 
 # Set the Current Working Directory inside the container
 WORKDIR /app
@@ -8,30 +8,44 @@ WORKDIR /app
 COPY go.mod go.sum ./
 
 # Download all dependencies. Dependencies will be cached if the go mod and go sum files are not changed
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
 # Copy the source code into the container
 COPY . .
 COPY .env.dev /app/.env
 
 # Build the Go app
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o fdlp-api ./cmd
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o api-standard-backend ./cmd
 
 # Start a new stage from scratch using the alpine base image
-FROM golang:1.22-alpine
-
-# Set the Current Working Directory inside the container
+FROM alpine:3.22
 WORKDIR /root/
 
-# Copy the pre-built binary file from the previous stage
-COPY --from=builder /app/fdlp-api .
+# Set timezone to Asia/Bangkok
+ENV TZ=Asia/Bangkok
 
-# Copy the `.env` file explicitly into the runtime environment
+# Install libwebp-tools for cwebp and dwebp binaries, ffmpeg for video processing, and tzdata for timezone
+RUN apk add --no-cache libwebp-tools libpng libjpeg-turbo giflib tiff ffmpeg ca-certificates tzdata
+
+# Create the .bin/webp directory and link cwebp binary for go-webpbin
+RUN mkdir -p /root/.bin/webp && \
+    ln -s /usr/bin/cwebp /root/.bin/webp/cwebp
+
+# Copy the pre-built binary from the builder stage
+COPY --from=builder /app/api-standard-backend .
+
+# Copy the .env file, credentials, and swagger docs
 COPY --from=builder /app/.env .
+COPY --from=builder /app/credentials/ ./credentials/
+COPY --from=builder /app/docs/ ./docs/
+COPY --from=builder /app/static/ ./static/
+COPY --from=builder /app/templates/ ./templates/
 
 # Expose port 8080 to the outside world
 EXPOSE 8080
 
-# Command to run the executable along with migration
-CMD ["sh", "-c", "./fdlp-api"]
-
+# Command to run the executable
+CMD ["./api-standard-backend"]

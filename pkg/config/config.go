@@ -6,14 +6,6 @@ import (
 )
 
 type Config struct {
-	DBHost     string
-	DBUser     string
-	DBPassword string
-	DBName     string
-	DBPort     string
-	DBSSLMode  string
-	DBTimeZone string
-
 	RedisHost     string
 	RedisPort     string
 	RedisPassword string
@@ -43,20 +35,13 @@ type Config struct {
 	StripeWebhookSecret  string
 
 	// MongoDB Config
-	MongoDBURI  string
-	MongoDBName string
+	MongoDBURI string
+	MongoDBDb  string
 }
 
 // New returns a new Config struct
 func New() *Config {
 	return &Config{
-		DBHost:        getEnv("DB_HOST", "localhost"),
-		DBUser:        getEnv("DB_USER", "user"),
-		DBPassword:    getEnv("DB_PASSWORD", "password"),
-		DBName:        getEnv("DB_NAME", "dbname"),
-		DBPort:        getEnv("DB_PORT", "5432"),
-		DBSSLMode:     getEnv("DB_SSLMODE", "disable"),
-		DBTimeZone:    getEnv("DB_TIMEZONE", "UTC"),
 		RedisHost:     getEnv("REDIS_HOST", "localhost"),
 		RedisPort:     getEnv("REDIS_PORT", "6379"),
 		RedisPassword: getEnv("REDIS_PASSWORD", "redispassword"),
@@ -85,8 +70,8 @@ func New() *Config {
 		StripeWebhookSecret:  getEnv("STRIPE_WEBHOOK_SECRET", ""),
 
 		// MongoDB Config
-		MongoDBURI:  getEnv("MONGODB_URI", "mongodb://localhost:27017"),
-		MongoDBName: getEnv("MONGODB_NAME", "fdlp_mongo"),
+		MongoDBURI: getEnv("MONGODB_URI", "mongodb://localhost:27017"),
+		MongoDBDb:  getEnv("MONGODB_DB", "fdlp_mongo"),
 	}
 }
 

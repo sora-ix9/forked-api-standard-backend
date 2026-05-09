@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm"
 )
 
 type UserService interface {
@@ -24,10 +24,10 @@ type userService struct {
 	repo      repositories.UserRepository
 	repoRole  repositories.RoleRepository
 	jwtSecret string
-	db        *gorm.DB
+	db        *mongo.Database
 }
 
-func NewUserService(repo repositories.UserRepository, repoRole repositories.RoleRepository, jwtSecret string, db *gorm.DB) UserService {
+func NewUserService(repo repositories.UserRepository, repoRole repositories.RoleRepository, jwtSecret string, db *mongo.Database) UserService {
 	return &userService{repo: repo, repoRole: repoRole, jwtSecret: jwtSecret, db: db}
 }
 
@@ -62,7 +62,7 @@ func (s *userService) CreateUser(data dto.CreateUserRequestBody) (*models.User, 
 		Username: data.Username,
 		Email:    data.Email,
 		Password: string(hashedPassword),
-		RoleID:   role.ID,
+		RoleID:   role.RoleID,
 	}
 
 	// Assuming you have a repositories method to save the User model
@@ -116,34 +116,29 @@ func (s *userService) LoginUser(data dto.LoginUserRequestBody) (*string, error) 
 }
 
 func (s *userService) CreateUserWithRole(data dto.CreateUserWithRoleRequestBody) (*models.User, error) {
-	var user models.User
-
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(data.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}
 
-	errTransaction := s.db.Transaction(func(tx *gorm.DB) error {
-		role, errRole := s.repoRole.GetByName(data.RoleName)
-		if role == nil || errRole != nil {
-			newRole := models.Role{Name: data.RoleName}
-			if err := s.repoRole.CreateWithTransaction(tx, &newRole); err != nil {
-				return err
-			}
-			role = &newRole
+	role, errRole := s.repoRole.GetByName(data.RoleName)
+	if role == nil || errRole != nil {
+		newRole := models.Role{Name: data.RoleName}
+		if err := s.repoRole.Create(&newRole); err != nil {
+			return nil, err
 		}
+		role = &newRole
+	}
 
-		user = models.User{
-			Username: data.Username,
-			Email:    data.Email,
-			Password: string(hashedPassword),
-			RoleID:   role.ID,
-		}
-		return s.repo.CreateWithTransaction(tx, &user)
-	})
+	user := models.User{
+		Username: data.Username,
+		Email:    data.Email,
+		Password: string(hashedPassword),
+		RoleID:   role.RoleID,
+	}
 
-	if errTransaction != nil {
-		return nil, errTransaction
+	if err := s.repo.Create(&user); err != nil {
+		return nil, err
 	}
 
 	return &user, nil

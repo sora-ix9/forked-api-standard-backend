@@ -6,20 +6,18 @@ import (
 	"fdlp-standard-api/internal/types"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type Role struct {
-	ID          types.UUID `gorm:"type:uuid;default:uuid_generate_v4();primary_key;"`
-	Name        string     `gorm:"not null;uniqueIndex"`
-	Description string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	RoleID      types.UUID `bson:"role_id,omitempty"`
+	Name        string     `bson:"name"`
+	Description string     `bson:"description"`
+	CreatedAt   time.Time  `bson:"created_at"`
+	UpdatedAt   time.Time  `bson:"updated_at"`
 }
 
-func (r *Role) BeforeCreate(tx *gorm.DB) (err error) {
-	if r.ID == [16]byte{} {
-		r.ID = types.UUID(uuid.New())
+func (r *Role) BeforeCreate() {
+	if r.RoleID == [16]byte{} {
+		r.RoleID = types.UUID(uuid.New())
 	}
-	return
 }

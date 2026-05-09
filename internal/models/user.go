@@ -5,24 +5,22 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type User struct {
-	ID        types.UUID `gorm:"type:uuid;default:uuid_generate_v4();primary_key;"`
-	Username  string     `gorm:"uniqueIndex;not null"`
-	Email     string     `gorm:"uniqueIndex;not null"`
-	Fisrtname string
-	Password  string     `gorm:"not null"`
-	RoleID    types.UUID `gorm:"type:uuid;not null"`
-	Role      Role       `gorm:"foreignKey:RoleID"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	UserID    types.UUID `bson:"user_id,omitempty"`
+	Username  string     `bson:"username"`
+	Email     string     `bson:"email"`
+	Fisrtname string     `bson:"firstname"`
+	Password  string     `bson:"password"`
+	RoleID    types.UUID `bson:"role_id"`
+	Role      Role       `bson:"role,omitempty"`
+	CreatedAt time.Time  `bson:"created_at"`
+	UpdatedAt time.Time  `bson:"updated_at"`
 }
 
-func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
-	if u.ID == [16]byte{} {
-		u.ID = types.UUID(uuid.New())
+func (u *User) BeforeCreate() {
+	if u.UserID == [16]byte{} {
+		u.UserID = types.UUID(uuid.New())
 	}
-	return
 }

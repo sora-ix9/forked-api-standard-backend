@@ -130,11 +130,8 @@ Fakduai Standard Project for API
 go mod tidy
 ```
 
-### Postgresql run on docker
-```bash
-# docker run --name local-postgres -e POSTGRES_PASSWORD=password -d postgres
-docker run --name local-postgres -e POSTGRES_PASSWORD=password -p 54320:5432 -d postgres
-```
+### Database setup
+MongoDB is used. Ensure you have a MongoDB instance running and update `MONGODB_URI` in `.env`.
 
 ## Usage
 ### Run project
@@ -145,16 +142,6 @@ go run ./cmd/main.go
 ### Run Live Reload
 ```bash
 air
-```
-
-### [DB] Create Migration file
-```bash
-atlas migrate diff --env local
-```
-
-### [DB] Apply with migration
-```bash
-atlas migrate apply --env local --url "postgres://postgres:password@localhost:54320/fdlp-dev-db?search_path=public&sslmode=disable"
 ```
 
 ## Best Practise
@@ -230,10 +217,6 @@ go tool cover -html=coverage.out
 ```
 
 ## FAQ
-### [Postgresql] Fix UUID not found
-```bash
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-```
 ## [Redis] Run on docker
 ```bash
 docker run --name local-redis -d -e REDIS_PASSWORD='redispassword' redis redis-server --requirepass redispassword

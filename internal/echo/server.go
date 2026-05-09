@@ -1,6 +1,7 @@
 package echo
 
 import (
+	"context"
 	"fdlp-standard-api/internal/dto"
 	"fdlp-standard-api/internal/handler"
 	"fdlp-standard-api/internal/middlewares"
@@ -9,14 +10,18 @@ import (
 	"fdlp-standard-api/internal/services"
 	"fdlp-standard-api/internal/utils"
 	"fdlp-standard-api/pkg/config"
-	"fdlp-standard-api/pkg/db"
+	"fdlp-standard-api/pkg/providers/mongodb"
+	"fdlp-standard-api/pkg/redisclient"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/go-playground/validator"
+	"github.com/go-redis/redis/v8"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
 	"github.com/watchakorn-18k/scalar-go"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 
 	"log"
 
@@ -58,7 +63,6 @@ func InitServer() {
 	}))
 
 	// Middleware
-	// e.Use(middleware.Logger())
 	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
 		Format: `${time_rfc3339} ${method} ${uri} ${status} ${latency_human}` + "\n",
 	}))
@@ -77,11 +81,16 @@ func InitServer() {
 		},
 	}
 
-	// Initialize Provider
+	// Initialize MongoDB
+	mongoClient := mongodb.NewClient(cfg)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	// defer mongoClient.Disconnect(ctx) // In a real app, you might want to keep it open
 
-	// Initialize Database with Config
-	database := db.InitializeDB(cfg)
-	defer db.CloseDB(database)
+	database := mongoClient.DB
+
+	// Initialize Redis
+	redisClient := redisclient.NewClient(cfg)
 
 	// Initialize Repo
 	userRepo := repositories.NewUserRepository(database)
@@ -102,6 +111,22 @@ func InitServer() {
 
 	// Routes
 	e.GET("/", helpCheckHandler)
+	e.GET("/health-mongo", func(c echo.Context) error {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if err := mongoClient.Client.Ping(ctx, readpref.Primary()); err != nil {
+			return c.JSON(http.StatusServiceUnavailable, map[string]string{"status": "fail", "error": err.Error()})
+		}
+		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+	})
+	e.GET("/health-redis", func(c echo.Context) error {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if err := redisClient.Ping(ctx).Err(); err != nil {
+			return c.JSON(http.StatusServiceUnavailable, map[string]string{"status": "fail", "error": err.Error()})
+		}
+		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+	})
 
 	// Documentation routes
 	statusMode := os.Getenv("BACKEND_MODE")
@@ -143,13 +168,13 @@ func InitServer() {
 	r := e.Group("/v1")
 
 	// Configure middleware with the custom claims type
-	config := echojwt.Config{
+	jwtConfig := echojwt.Config{
 		NewClaimsFunc: func(c echo.Context) jwt.Claims {
 			return new(dto.JwtCustomClaims)
 		},
 		SigningKey: []byte(cfg.JWTSecret),
 	}
-	r.Use(echojwt.WithConfig(config))
+	r.Use(echojwt.WithConfig(jwtConfig))
 
 	// Register Routes
 	routes.RegisterUserRoutes(e, r, userHandler)

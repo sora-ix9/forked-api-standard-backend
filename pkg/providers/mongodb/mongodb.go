@@ -34,7 +34,7 @@ func NewClient(cfg *config.Config) *MongoDBClient {
 		log.Fatalf("Failed to ping MongoDB: %v", err)
 	}
 
-	db := client.Database(cfg.MongoDBName)
+	db := client.Database(cfg.MongoDBDb)
 
 	return &MongoDBClient{
 		Client: client,

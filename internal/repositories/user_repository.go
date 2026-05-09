@@ -1,10 +1,14 @@
 package repositories
 
 import (
+	"context"
 	"fdlp-standard-api/internal/models"
 	"math"
+	"time"
 
-	"gorm.io/gorm"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type UserRepository interface {
@@ -12,68 +16,87 @@ type UserRepository interface {
 	Create(user *models.User) error
 	Update(user *models.User) error
 	GetByEmail(email string) (*models.User, error)
-	CreateWithTransaction(tx *gorm.DB, user *models.User) error
 	FindAllByFilterAndPage(filter map[string]interface{}, page, pageSize int) ([]models.User, int64, int, error)
 }
 
 type userRepository struct {
-	db *gorm.DB
+	db *mongo.Database
 }
 
-func NewUserRepository(db *gorm.DB) UserRepository {
+func NewUserRepository(db *mongo.Database) UserRepository {
 	return &userRepository{db: db}
 }
 
 func (repo *userRepository) GetById(id string) (*models.User, error) {
 	var user models.User
-	result := repo.db.Preload("Role").First(&user, id)
-	return &user, result.Error
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := repo.db.Collection("users").FindOne(ctx, bson.M{"user_id": id}).Decode(&user)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
 
 func (repo *userRepository) GetByEmail(email string) (*models.User, error) {
 	var user models.User
-	result := repo.db.Where(&models.User{Email: email}).Preload("Role").First(&user)
-	return &user, result.Error
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := repo.db.Collection("users").FindOne(ctx, bson.M{"email": email}).Decode(&user)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
 
 func (repo *userRepository) Create(user *models.User) error {
-	return repo.db.Create(user).Error
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err := repo.db.Collection("users").InsertOne(ctx, user)
+	return err
 }
 
 func (repo *userRepository) Update(user *models.User) error {
-	return repo.db.Model(models.User{}).Where("id = ?", user.ID).Updates(user).Error
-}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-func (repo *userRepository) CreateWithTransaction(tx *gorm.DB, user *models.User) error {
-	if len(user.RoleID) > 0 {
-		var role models.Role
-		if err := tx.Model(&models.Role{}).Where("id = ?", user.RoleID).First(&role).Error; err != nil {
-			return err
-		}
-		user.Role = role
-	}
-	return tx.Create(user).Error
+	_, err := repo.db.Collection("users").UpdateOne(
+		ctx,
+		bson.M{"user_id": user.UserID},
+		bson.M{"$set": user},
+	)
+	return err
 }
 
 func (repo *userRepository) FindAllByFilterAndPage(filter map[string]interface{}, page, pageSize int) ([]models.User, int64, int, error) {
 	var users []models.User
-	var totalRows int64
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	query := repo.db.Model(&models.User{})
-	for key, value := range filter {
-		query = query.Where(key+" = ?", value)
+	mongoFilter := bson.M{}
+	for k, v := range filter {
+		mongoFilter[k] = v
 	}
 
-	// Count total results
-	err := query.Count(&totalRows).Error
+	totalRows, err := repo.db.Collection("users").CountDocuments(ctx, mongoFilter)
 	if err != nil {
 		return nil, 0, 0, err
 	}
 
-	// Retrieve paginated results
-	offset := (page - 1) * pageSize
-	err = query.Offset(offset).Limit(pageSize).Preload("Role").Find(&users).Error
+	opts := options.Find().
+		SetSkip(int64((page - 1) * pageSize)).
+		SetLimit(int64(pageSize))
+
+	cursor, err := repo.db.Collection("users").Find(ctx, mongoFilter, opts)
 	if err != nil {
+		return nil, 0, 0, err
+	}
+	defer cursor.Close(ctx)
+
+	if err = cursor.All(ctx, &users); err != nil {
 		return nil, 0, 0, err
 	}
 
