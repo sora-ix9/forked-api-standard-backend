@@ -2,57 +2,26 @@ package echo
 
 import (
 	"context"
-	"fdlp-standard-api/internal/dto"
 	"fdlp-standard-api/internal/handler"
 	"fdlp-standard-api/internal/middlewares"
 	"fdlp-standard-api/internal/repositories"
 	"fdlp-standard-api/internal/routes"
 	"fdlp-standard-api/internal/services"
-	"fdlp-standard-api/internal/utils"
 	"fdlp-standard-api/pkg/config"
 	"fdlp-standard-api/pkg/providers/mongodb"
 	"fdlp-standard-api/pkg/redisclient"
+	"fdlp-standard-api/pkg/utils"
 	"net/http"
-	"os"
 	"time"
 
-	"github.com/go-playground/validator"
-	"github.com/go-redis/redis/v8"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
-	"github.com/watchakorn-18k/scalar-go"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
-
-	"log"
-
-	"github.com/joho/godotenv"
-	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
-type CustomValidator struct {
-	validator *validator.Validate
-}
-
-func (cv *CustomValidator) Validate(i interface{}) error {
-	return cv.validator.Struct(i)
-}
-
 // InitServer initializes and starts the Echo web server
-func InitServer() {
-	// Loading .env from the root directory
-	err := godotenv.Load(".env") // Adjust the path according to your project structure
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
-	utils.SetGlobalTimezone()
-	log.Println("Global timezone set to Asia/Bangkok (UTC+07:00)")
-
-	// Initialize Configuration
-	cfg := config.New()
-
+func InitServer(cfg *config.Config) {
 	// Echo
 	e := echo.New()
 
@@ -83,10 +52,6 @@ func InitServer() {
 
 	// Initialize MongoDB
 	mongoClient := mongodb.NewClient(cfg)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	// defer mongoClient.Disconnect(ctx) // In a real app, you might want to keep it open
-
 	database := mongoClient.DB
 
 	// Initialize Redis
@@ -109,72 +74,44 @@ func InitServer() {
 	// Route Websocket
 	e.GET("/ws", websocketHandler.WebSocketInit)
 
+	// Global Breakers for health checks
+	mongoBreaker := utils.NewCircuitBreaker("Health-Mongo")
+	redisBreaker := utils.NewCircuitBreaker("Health-Redis")
+
 	// Routes
 	e.GET("/", helpCheckHandler)
 	e.GET("/health-mongo", func(c echo.Context) error {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		if err := mongoClient.Client.Ping(ctx, readpref.Primary()); err != nil {
+		_, err := utils.ExecuteWithBreaker(mongoBreaker, func() (interface{}, error) {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return nil, mongoClient.Client.Ping(ctx, readpref.Primary())
+		})
+
+		if err != nil {
 			return c.JSON(http.StatusServiceUnavailable, map[string]string{"status": "fail", "error": err.Error()})
 		}
 		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
 	e.GET("/health-redis", func(c echo.Context) error {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		if err := redisClient.Ping(ctx).Err(); err != nil {
+		_, err := utils.ExecuteWithBreaker(redisBreaker, func() (interface{}, error) {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return nil, redisClient.Ping(ctx).Err()
+		})
+
+		if err != nil {
 			return c.JSON(http.StatusServiceUnavailable, map[string]string{"status": "fail", "error": err.Error()})
 		}
 		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
 
 	// Documentation routes
-	statusMode := os.Getenv("BACKEND_MODE")
-	if statusMode == "" {
-		statusMode = "production"
-	}
-
-	if statusMode == "development" {
-		e.GET("/docs", func(c echo.Context) error {
-			htmlContent, err := scalar.ApiReferenceHTML(&scalar.Options{
-				SpecURL: "./docs/swagger.yaml",
-				CustomOptions: scalar.CustomOptions{
-					PageTitle: "PINTO API SPEC",
-				},
-				DarkMode: true,
-			})
-
-			if err != nil {
-				return err
-			}
-			c.Response().Header().Set("Content-Type", "text/html")
-			return c.HTML(http.StatusOK, htmlContent)
-		})
-		e.GET("/swagger.yaml", func(c echo.Context) error {
-			return c.File("./docs/swagger.yaml")
-		})
-		// Documentation routes
-		e.Static("/docs", "docs")
-		e.GET("/schema", func(c echo.Context) error {
-			htmlContent, err := os.ReadFile("./docs/database-schema.html")
-			if err != nil {
-				return err
-			}
-			c.Response().Header().Set("Content-Type", "text/html")
-			return c.HTML(http.StatusOK, string(htmlContent))
-		})
-	}
+	middlewares.RegisterDocRoutes(e)
 	// Routes Authen
 	r := e.Group("/v1")
 
 	// Configure middleware with the custom claims type
-	jwtConfig := echojwt.Config{
-		NewClaimsFunc: func(c echo.Context) jwt.Claims {
-			return new(dto.JwtCustomClaims)
-		},
-		SigningKey: []byte(cfg.JWTSecret),
-	}
-	r.Use(echojwt.WithConfig(jwtConfig))
+	r.Use(middlewares.JWTMiddleware(cfg.JWTSecret))
 
 	// Register Routes
 	routes.RegisterUserRoutes(e, r, userHandler)

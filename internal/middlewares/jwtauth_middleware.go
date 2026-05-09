@@ -8,9 +8,13 @@ import (
 	"net/http"
 	"strings"
 
+	"fdlp-standard-api/pkg/utils"
+
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/labstack/echo/v4"
 )
+
+var redisBreaker = utils.NewCircuitBreaker("Redis-Auth")
 
 func JWTAuthMiddleware(next echo.HandlerFunc, cfg *config.Config) echo.HandlerFunc {
 	return func(c echo.Context) error {
@@ -22,11 +26,21 @@ func JWTAuthMiddleware(next echo.HandlerFunc, cfg *config.Config) echo.HandlerFu
 		rdb := redisclient.NewClient(cfg)
 		ctx := c.Request().Context() // Correctly use Echo's request context
 
-		// Check if the token is blacklisted
-		result, err := rdb.Get(ctx, tokenString).Result()
-		if err == nil && result == "blacklisted" {
+		// Check if the token is blacklisted using Circuit Breaker
+		_, err := utils.ExecuteWithBreaker(redisBreaker, func() (interface{}, error) {
+			result, err := rdb.Get(ctx, tokenString).Result()
+			if err == nil && result == "blacklisted" {
+				return nil, fmt.Errorf("token blacklisted")
+			}
+			return nil, err
+		})
+
+		if err != nil && err.Error() == "token blacklisted" {
 			return echo.NewHTTPError(http.StatusUnauthorized, "Invalid token")
 		}
+		// If it's a circuit breaker error or other redis error, we might want to continue or fail.
+		// Usually, if Redis is down, we might allow the request if it's not a critical security risk,
+		// or fail if it's mandatory. Here we'll just log and continue for now if it's a breaker error.
 
 		// Verify JWT as usual
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
