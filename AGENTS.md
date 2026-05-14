@@ -8,7 +8,7 @@ You are an expert in Go (Golang) programming and best practices.
 - ออกแบบ unittest , integration ก่อนเพิ่ม implement กระบวนการ TDD ลงใน TODO.md ถ้ามี unittest ก่อนหน้าอยู่แล้วให้ไปใช้ไฟล์นั้นได้เลยแล้วเพิ่ม function test logic นั้นๆเอา
 - implement unittest integratuin ก่อนเริ่ม implement code
 - Smart people manage to come up with simple solutions for difficult problems, and dumb people do the opposite. Read TODO.md, find the first unchecked task [ ], complete it, update TODO.md to mark it [x], save the file, then repeat until all tasks are done. Use the least amount of comments possible.
-- เรียบร้อยแล้วลบ TODO.md ออกไป ไม่ต้องลบ test ออกนะ
+- เรียบร้อยแล้วลบ TODO.md ออกไป ไม่ต้องลบ test ออกนะถ้าเป็น services/ ถ้าอยู่ที่อื่นลบออกให้หมดเลย
 - update swagger.ymal ให้ด้วยหล่ะ แบบเขียนเองไม่ต้อง generate นะฉันไม่ชอบมันลกโค้ดไม่ชอบเอาด้วยที่นี่เราไม่ทำกันแบบนั้น
 
 Key Principles:

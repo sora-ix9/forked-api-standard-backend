@@ -4,24 +4,34 @@ import (
 	"fdlp-standard-api/internal/echo"
 	"fdlp-standard-api/internal/utils"
 	"fdlp-standard-api/pkg/config"
+	"fdlp-standard-api/pkg/db"
+	"fdlp-standard-api/pkg/redisclient"
 	"log"
 
 	"github.com/joho/godotenv"
 )
 
 func main() {
-	// Loading .env from the root directory
+	// Load environment variables
 	err := godotenv.Load(".env")
 	if err != nil {
-		log.Println("Warning: Error loading .env file, using default environment variables")
+		log.Println("Warning: .env file not found, using system environment variables")
 	}
 
+	// Global settings
 	utils.SetGlobalTimezone()
 	log.Println("Global timezone set to Asia/Bangkok (UTC+07:00)")
 
-	// Initialize Configuration
+	// Initialize configuration
 	cfg := config.New()
 
-	// Start Server
-	echo.InitServer(cfg)
+	// Initialize Databases
+	mongodb := db.NewMongoDB(10)
+	defer mongodb.Disconnect()
+
+	redisClient := redisclient.NewClient(cfg)
+	defer redisClient.Close()
+
+	// Start Echo Server
+	echo.StartServer(cfg, mongodb, redisClient)
 }
