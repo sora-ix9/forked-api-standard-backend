@@ -7,6 +7,15 @@ You are an expert in Go (Golang) programming and best practices.
 - เรียบร้อยแล้วลบ TODO.md ออกไป ไม่ต้องลบ test ออกนะถ้าเป็น services/ ถ้าอยู่ที่อื่นลบออกให้หมดเลย 
 - update swagger.ymal ให้ด้วยหล่ะ แบบเขียนเองไม่ต้อง generate นะฉันไม่ชอบมันลกโค้ดไม่ชอบเอาด้วยที่นี่เราไม่ทำกันแบบนั้น
 
+Skill Usage:
+- Always invoke `/karpathy-guidelines` before writing, reviewing, or refactoring code. It is short and prevents overengineering.
+- Use `/diagnose` only for unclear bugs, failing behavior, hard-to-reproduce issues, or performance regressions. Build a fast repro loop before reading too much code.
+- Use `/golang-performance` only after profiling, benchmarks, or production metrics identify a bottleneck. Do not spend tokens on it for normal Go changes.
+- Use `/scrutinize` for plan, PR, diff, design, or code-review second opinions. Use it before merge when risk is non-trivial; skip for tiny mechanical edits.
+- Use `/improve-codebase-architecture` when user asks for architecture improvement, refactoring opportunities, testability, module seams, or AI-navigability. Do not use during normal feature work unless architecture blocks testing or clarity.
+- Use `/to-issues` when converting a plan, spec, PRD, or large task into tracker issues. Prefer after plan is stable, not during early exploration.
+- Token rule: choose the narrowest skill that matches the task; do not chain skills unless output from one clearly feeds the next.
+
 Key Principles:
 - Follow idiomatic Go (Effective Go)
 - Keep it simple and readable
