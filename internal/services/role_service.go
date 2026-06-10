@@ -4,6 +4,7 @@ import (
 	"fdlp-standard-api/internal/dto"
 	"fdlp-standard-api/internal/models"
 	"fdlp-standard-api/internal/repositories"
+	"time"
 )
 
 type RoleService interface {
@@ -24,10 +25,14 @@ func (s *roleService) GetRole(id string) (*models.Role, error) {
 }
 
 func (s *roleService) CreateRole(data dto.CreateRoleRequestBody) (*models.Role, error) {
+	now := time.Now()
 	role := models.Role{
 		Name:        data.Name,
 		Description: data.Description,
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
+	role.BeforeCreate()
 
 	if err := s.repo.Create(&role); err != nil {
 		return nil, err

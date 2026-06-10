@@ -172,6 +172,49 @@ paths:
               schema:
                 $ref: '#/components/schemas/StandardResponseRole'
 
+  /post:
+    get:
+      summary: Get post by ID
+      tags:
+        - Post
+      parameters:
+        - in: query
+          name: id
+          schema:
+            type: string
+          required: true
+          description: Post ID
+      responses:
+        '200':
+          description: Post found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponsePost'
+        '404':
+          description: Post not found
+
+  /post/create-post:
+    post:
+      summary: Create a new post
+      tags:
+        - Post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePostRequestBody'
+      responses:
+        '201':
+          description: Post created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponsePost'
+        '400':
+          description: Bad request
+
   /v1/user/{id}:
     get:
       summary: Get user by ID (Admin only)
@@ -281,6 +324,13 @@ components:
         - properties:
             data:
               $ref: '#/components/schemas/User'
+
+    StandardResponsePost:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+        - properties:
+            data:
+              $ref: '#/components/schemas/Post'
 
     StandardResponseRole:
       allOf:
@@ -393,6 +443,36 @@ components:
           format: uuid
         Role:
           $ref: '#/components/schemas/Role'
+        CreatedAt:
+          type: string
+          format: date-time
+        UpdatedAt:
+          type: string
+          format: date-time
+
+    CreatePostRequestBody:
+      type: object
+      required: [title, content, author]
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        author:
+          type: string
+
+    Post:
+      type: object
+      properties:
+        PostID:
+          type: string
+          format: uuid
+        Title:
+          type: string
+        Content:
+          type: string
+        Author:
+          type: string
         CreatedAt:
           type: string
           format: date-time

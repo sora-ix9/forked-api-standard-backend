@@ -1,0 +1,17 @@
+@contentType = application/json
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiYWRtaW4iLCJyb2xlIjoiYWRtaW4iLCJyb2xlX25hbWUiOiJBZG1pbmlzdHJhdG9yIiwiZXhwIjoxNzE0ODkzMzQ1fQ.dsGIIgQwreHMirWshKvzIVp-SW5Ku4Xk5JfA6l_3mIo
+
+# Create Post
+POST http://localhost:1323/post/create-post
+Content-Type: {{contentType}}
+
+{
+    "title": "My First Post",
+    "content": "Hello World",
+    "author": "admin"
+}
+###
+
+# Get Post by ID
+GET http://localhost:1323/post?id=<post_id_here>
+###

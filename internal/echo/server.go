@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/websocket"
 	"github.com/labstack/echo/v4"
@@ -30,6 +31,7 @@ func StartServer(cfg *config.Config, mongodb *db.MongoDB, redisClient *redis.Cli
 func newServer(cfg *config.Config, mongodb *db.MongoDB, redisClient *redis.Client) *echo.Echo {
 	// Echo
 	e := echo.New()
+	e.Validator = &customValidator{v: validator.New()}
 
 	// CORS
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
@@ -64,15 +66,18 @@ func newServer(cfg *config.Config, mongodb *db.MongoDB, redisClient *redis.Clien
 	// Initialize Repo
 	userRepo := repositories.NewUserRepository(database)
 	roleRepo := repositories.NewRoleRepository(database)
+	postRepo := repositories.NewPostRepository(database)
 
 	// Initialize Service
 	userService := services.NewUserService(userRepo, roleRepo, cfg.JWTSecret, database)
 	roleService := services.NewRoleService(roleRepo)
+	postService := services.NewPostService(postRepo)
 	websocketService := services.NewWebSocketService()
 
 	// Initialize Handler
 	userHandler := handler.NewUserHandler(userService, websocketService)
 	roleHandler := handler.NewRoleHandler(roleService)
+	postHandler := handler.NewPostHandler(postService)
 	websocketHandler := handler.NewWebsocketHandler(websocketService, upgrader)
 
 	// Route Websocket
@@ -123,6 +128,7 @@ func newServer(cfg *config.Config, mongodb *db.MongoDB, redisClient *redis.Clien
 	// Register Routes
 	routes.RegisterUserRoutes(e, r, userHandler)
 	routes.RegisterRoleRoutes(e, roleHandler)
+	routes.RegisterPostRoutes(e, postHandler)
 
 	return e
 }

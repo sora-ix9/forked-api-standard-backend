@@ -1,5 +1,5 @@
 # Use the official Golang Alpine image to create a build artifact.
-FROM golang:1.26 as builder
+FROM golang:1.26 AS builder
 
 # Set the Current Working Directory inside the container
 WORKDIR /app
@@ -13,7 +13,6 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 # Copy the source code into the container
 COPY . .
-COPY .env.dev /app/.env
 
 # Build the Go app
 RUN --mount=type=cache,target=/root/.cache/go-build \
@@ -37,12 +36,7 @@ RUN mkdir -p /root/.bin/webp && \
 # Copy the pre-built binary from the builder stage
 COPY --from=builder /app/api-standard-backend .
 
-# Copy the .env file, credentials, and swagger docs
-COPY --from=builder /app/.env .
-COPY --from=builder /app/credentials/ ./credentials/
 COPY --from=builder /app/docs/ ./docs/
-COPY --from=builder /app/static/ ./static/
-COPY --from=builder /app/templates/ ./templates/
 
 # Expose port 8080 to the outside world
 EXPOSE 8080
